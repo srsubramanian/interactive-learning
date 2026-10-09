@@ -27,6 +27,29 @@ describe('judge', () => {
     expect(r.verdict).toBe('wrong');
     expect(r.line).not.toMatch(/12/);
   });
+  it('does not leak the answer written as a word', async () => {
+    claudeSays({ said: 11, verdict: 'wrong', line: 'Almost! Count on from seven: eight, nine, ten, eleven, twelve.' });
+    const r = await judge({ a: 7, b: 5, op: '+', attempt: 1, transcript: 'eleven' });
+    expect(r.line).toBe('Not quite. Try again!');
+    claudeSays({ said: 20, verdict: 'wrong', line: 'So close! It is twenty one.' });
+    const r2 = await judge({ a: 13, b: 8, op: '+', attempt: 2, transcript: 'twenty' });
+    expect(r2.line).toBe('Not quite. Try again!');
+  });
+  it('keeps a hint that does not give the answer away', async () => {
+    claudeSays({ said: 11, verdict: 'wrong', line: 'Almost! Start at seven and count up five.' });
+    const r = await judge({ a: 7, b: 5, op: '+', attempt: 1, transcript: 'eleven' });
+    expect(r.line).toBe('Almost! Start at seven and count up five.');
+  });
+  it('says the answer as a word on the third try fallback', async () => {
+    claudeSays({ said: 11, verdict: 'wrong' });
+    const r = await judge({ a: 7, b: 5, op: '+', attempt: 3, transcript: 'eleven' });
+    expect(r.line).toMatch(/^The answer is twelve\./);
+  });
+  it('accepts a number the model returned as a string', async () => {
+    claudeSays({ said: '12', verdict: 'correct', line: 'Yes! Seven plus five is twelve!' });
+    const r = await judge({ a: 7, b: 5, op: '+', attempt: 1, transcript: '12.' });
+    expect(r).toMatchObject({ said: 12, verdict: 'correct' });
+  });
   it('empty transcript is unclear without calling the API', async () => {
     const spy = vi.spyOn(globalThis, 'fetch');
     spy.mockClear();
