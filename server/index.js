@@ -43,10 +43,26 @@ const needKey = (res, key, name) => {
   return true;
 };
 
+// Only answer when the page was opened at an address we expect. This stops a web page on some
+// other site from using this server (and the API keys behind it), including by DNS rebinding.
+export function hostAllowed(host) {
+  const name = String(host || '').toLowerCase().replace(/:\d+$/, '').replace(/^\[|\]$/g, '');
+  return name === 'localhost' || name === '127.0.0.1' || name === '::1' || name.endsWith('.ts.net') || config.allowedHosts.includes(name);
+}
+// Writes must come from this app: browsers send Sec-Fetch-Site, and a JSON or audio body cannot be
+// sent cross-site without a CORS preflight, which this server never approves.
+function crossSiteWrite(req) {
+  if (req.headers['sec-fetch-site'] === 'cross-site') return true;
+  const type = String(req.headers['content-type'] || '').split(';')[0].trim().toLowerCase();
+  return req.url.startsWith('/api/stt') ? !type.startsWith('audio/') : type !== 'application/json';
+}
+
 export const server = http.createServer(async (req, res) => {
   try {
+    if (!hostAllowed(req.headers.host)) return sendJson(res, 403, { error: 'Unknown host. Add it to ALLOWED_HOSTS in .env.' });
     const url = new URL(req.url, 'http://localhost');
     const p = url.pathname;
+    if (req.method === 'POST' && p.startsWith('/api/') && crossSiteWrite(req)) return sendJson(res, 403, { error: 'Not allowed.' });
 
     if (req.method === 'GET' && p === '/api/config') {
       return sendJson(res, 200, { sttProvider: config.sttProvider, hasElevenLabs: !!config.elevenKey, hasAnthropic: !!config.anthropicKey, model: config.claudeModel });

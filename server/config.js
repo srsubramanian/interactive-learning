@@ -42,5 +42,7 @@ export const config = {
   sttProvider: (env.STT_PROVIDER || 'elevenlabs').toLowerCase(), // "elevenlabs" or "browser"
   anthropicUrl: env.ANTHROPIC_API_URL || 'https://api.anthropic.com/v1/messages',
   elevenBase: env.ELEVENLABS_API_BASE || 'https://api.elevenlabs.io',
-  voiceId: env.ELEVENLABS_VOICE_ID || ''
+  voiceId: env.ELEVENLABS_VOICE_ID || '',
+  // Host names allowed besides localhost and Tailscale (*.ts.net), comma separated.
+  allowedHosts: (env.ALLOWED_HOSTS || '').split(',').map((h) => h.trim().toLowerCase()).filter(Boolean)
 };
