@@ -6,9 +6,11 @@ import path from 'node:path';
 process.env.DATA_DIR = fs.mkdtempSync(path.join(os.tmpdir(), 'jm-'));
 process.env.ANTHROPIC_API_KEY = 'k';
 process.env.ELEVENLABS_API_KEY = 'k';
+process.env.ELEVENLABS_VOICE_ID = 'v';
 
 const { judge, explain } = await import('../server/claude.js');
 const { cleanStore } = await import('../server/schema.js');
+const { parseEnvLine } = await import('../server/config.js');
 const { server } = await import('../server/index.js');
 
 const claudeSays = (obj) =>
@@ -58,6 +60,34 @@ describe('cleanStore', () => {
     expect(s.progress.add[0]).toMatchObject({ r: 'miss', a: 40, op: '+' });
     expect(s.progress.sub).toEqual([]);
     expect(s.lessons).toEqual([]);
+  });
+});
+
+describe('.env lines', () => {
+  it('reads the value and ignores a note after it', () => {
+    expect(parseEnvLine('PORT=3000')).toEqual(['PORT', '3000']);
+    expect(parseEnvLine('ELEVENLABS_VOICE_ID=abc123      # pick a specific voice')).toEqual(['ELEVENLABS_VOICE_ID', 'abc123']);
+    expect(parseEnvLine('ELEVENLABS_VOICE_ID=     # nothing chosen')).toEqual(['ELEVENLABS_VOICE_ID', '']);
+    expect(parseEnvLine('NAME="a # b"')).toEqual(['NAME', 'a # b']);
+    expect(parseEnvLine('# PORT=3000')).toBeNull();
+  });
+});
+
+describe('tts', () => {
+  it('pays for a sentence once and reuses the saved clip, even after a restart', async () => {
+    const spy = vi.spyOn(globalThis, 'fetch').mockImplementation(async () => new Response(new Uint8Array([1, 2, 3]), { status: 200 }));
+    spy.mockClear();
+    const before = await import('../server/eleven.js');
+    const [a, b] = await Promise.all([before.tts('Hello there'), before.tts('Hello there')]);
+    expect([...a]).toEqual([1, 2, 3]);
+    expect(b).toBe(a);
+    await before.tts('Hello there');
+    vi.resetModules(); // a fresh server: nothing in memory, only the clip on disk
+    const after = await import('../server/eleven.js');
+    expect([...(await after.tts('Hello there'))]).toEqual([1, 2, 3]);
+    expect(spy).toHaveBeenCalledTimes(1);
+    await after.tts('Something new');
+    expect(spy).toHaveBeenCalledTimes(2);
   });
 });
 
