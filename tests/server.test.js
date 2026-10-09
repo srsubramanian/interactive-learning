@@ -27,6 +27,29 @@ describe('judge', () => {
     expect(r.verdict).toBe('wrong');
     expect(r.line).not.toMatch(/12/);
   });
+  it('does not leak the answer written as a word', async () => {
+    claudeSays({ said: 11, verdict: 'wrong', line: 'Almost! Count on from seven: eight, nine, ten, eleven, twelve.' });
+    const r = await judge({ a: 7, b: 5, op: '+', attempt: 1, transcript: 'eleven' });
+    expect(r.line).toBe('Not quite. Try again!');
+    claudeSays({ said: 20, verdict: 'wrong', line: 'So close! It is twenty one.' });
+    const r2 = await judge({ a: 13, b: 8, op: '+', attempt: 2, transcript: 'twenty' });
+    expect(r2.line).toBe('Not quite. Try again!');
+  });
+  it('keeps a hint that does not give the answer away', async () => {
+    claudeSays({ said: 11, verdict: 'wrong', line: 'Almost! Start at seven and count up five.' });
+    const r = await judge({ a: 7, b: 5, op: '+', attempt: 1, transcript: 'eleven' });
+    expect(r.line).toBe('Almost! Start at seven and count up five.');
+  });
+  it('says the answer as a word on the third try fallback', async () => {
+    claudeSays({ said: 11, verdict: 'wrong' });
+    const r = await judge({ a: 7, b: 5, op: '+', attempt: 3, transcript: 'eleven' });
+    expect(r.line).toMatch(/^The answer is twelve\./);
+  });
+  it('accepts a number the model returned as a string', async () => {
+    claudeSays({ said: '12', verdict: 'correct', line: 'Yes! Seven plus five is twelve!' });
+    const r = await judge({ a: 7, b: 5, op: '+', attempt: 1, transcript: '12.' });
+    expect(r).toMatchObject({ said: 12, verdict: 'correct' });
+  });
   it('empty transcript is unclear without calling the API', async () => {
     const spy = vi.spyOn(globalThis, 'fetch');
     spy.mockClear();
@@ -68,7 +91,7 @@ describe('http', () => {
   it('store round-trips', async () => {
     vi.restoreAllMocks();
     const att = { r: 'first', a: 2, b: 3, op: '+', said: 5, ts: 1 };
-    await fetch(base + '/api/store', { method: 'POST', body: JSON.stringify({ progress: { add: [att], sub: [] }, lessons: [] }) });
+    await fetch(base + '/api/store', { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ progress: { add: [att], sub: [] }, lessons: [] }) });
     const got = await (await fetch(base + '/api/store')).json();
     expect(got.progress.add[0]).toEqual(att);
   });
@@ -79,5 +102,25 @@ describe('http', () => {
   });
   it('unknown api path is 404', async () => {
     expect((await fetch(base + '/api/nope')).status).toBe(404);
+  });
+});
+
+describe('only this app may use the server', () => {
+  let base;
+  beforeAll(async () => { await new Promise((r) => server.listen(0, '127.0.0.1', r)); base = 'http://127.0.0.1:' + server.address().port; });
+  afterAll(() => server.close());
+  const post = (path, headers, body = '{}') => fetch(base + path, { method: 'POST', headers, body });
+  it('rejects a form-style post from another site', async () => {
+    expect((await post('/api/store', { 'content-type': 'text/plain' })).status).toBe(403);
+    expect((await post('/api/judge', { 'content-type': 'application/json', 'sec-fetch-site': 'cross-site' })).status).toBe(403);
+    expect((await post('/api/stt', { 'content-type': 'application/json' })).status).toBe(403);
+  });
+  it('accepts posts from the app', async () => {
+    expect((await post('/api/store', { 'content-type': 'application/json', 'sec-fetch-site': 'same-origin' })).status).toBe(200);
+  });
+  it('allows localhost and Tailscale names, refuses others', async () => {
+    const { hostAllowed } = await import('../server/index.js');
+    for (const h of ['localhost:5173', '127.0.0.1:3000', '[::1]:3000', 'subras-mac.tail1234.ts.net']) expect(hostAllowed(h), h).toBe(true);
+    for (const h of ['evil.example', 'localhost.evil.example', '', 'ts.net.evil.example']) expect(hostAllowed(h), h).toBe(false);
   });
 });
