@@ -53,31 +53,31 @@ export function LessonPlayer({ lesson, speaker, autoPlay, onSimpler, onDeeper, b
     <div className="player card">
       <div className="player-head">
         <h3>{lesson.title}</h3>
-        <span className={'tag ' + lesson.source}>{lesson.source === 'claude' ? 'Drawn by Claude' : 'Built-in'}</span>
+        {lesson.source === 'claude' && <span className="tag claude">Drawn by Claude</span>}
       </div>
       <div className="stage" aria-live="polite">
         <Visual v={step.visual} />
       </div>
       <p className="say">{step.say}</p>
       {err && <p className="err">{err} You can still use the arrows to read each step.</p>}
-      <div className="dotsnav" aria-hidden>
-        {lesson.steps.map((_, k) => (
-          <span key={k} className={'pip' + (k === i ? ' on' : '')} />
-        ))}
-      </div>
-      <div className="controls">
-        <button className="btn ghost" onClick={() => go(i - 1)} disabled={i === 0}>◀ Back</button>
+      <div className="transport">
+        <button className="round" aria-label="Back" onClick={() => go(i - 1)} disabled={i === 0}>←</button>
         {playing ? (
           <button className="btn" onClick={halt}>⏸ Pause</button>
         ) : (
           <button className="btn primary" onClick={() => void play(last ? 0 : i)}>{last ? '↺ Again' : '▶ Play'}</button>
         )}
-        <button className="btn ghost" onClick={() => go(i + 1)} disabled={last}>Next ▶</button>
+        <button className="round" aria-label="Next" onClick={() => go(i + 1)} disabled={last}>→</button>
+      </div>
+      <div className="dotsnav" aria-hidden>
+        {lesson.steps.map((_, k) => (
+          <span key={k} className={'pip' + (k === i ? ' on' : '')} />
+        ))}
       </div>
       {(onSimpler || onDeeper) && (
-        <div className="controls depth">
-          {onSimpler && <button className="btn ghost" onClick={() => { halt(); onSimpler(); }} disabled={busy || lesson.level <= 1}>🌱 Make it simpler</button>}
-          {onDeeper && <button className="btn ghost" onClick={() => { halt(); onDeeper(); }} disabled={busy || lesson.level >= 4}>🚀 Go deeper</button>}
+        <div className="quiet-row">
+          {onSimpler && <button className="quiet" onClick={() => { halt(); onSimpler(); }} disabled={busy || lesson.level <= 1}>🌱 Simpler</button>}
+          {onDeeper && <button className="quiet" onClick={() => { halt(); onDeeper(); }} disabled={busy || lesson.level >= 4}>🚀 Deeper</button>}
         </div>
       )}
     </div>

@@ -16,13 +16,13 @@ const HEARING_TEXT: Record<string, string> = {
 export function Practice({ p, mode, setMode, keysOk }: { p: P; mode: Mode; setMode: (m: Mode) => void; keysOk: boolean }) {
   const v = p.view;
   const [typed, setTyped] = useState('');
+  const [typing, setTyping] = useState(false);
 
   if (v.phase === 'idle') {
     return (
       <section className="card start">
         <div className="big-emoji" aria-hidden>🎤</div>
         <h2>Ready to play?</h2>
-        <p>She hears each question out loud, sees it on the screen, and answers with her voice.</p>
         <label className="field">
           <span>What shall we practice?</span>
           <select value={mode} onChange={(e) => setMode(e.target.value as Mode)}>
@@ -56,6 +56,9 @@ export function Practice({ p, mode, setMode, keysOk }: { p: P; mode: Mode; setMo
     p.submitTyped(typed.trim());
     setTyped('');
   };
+  // After two unclear tries the microphone waits for a tap, so that instruction must show.
+  const needTap = v.phase === 'running' && v.micOk && v.hearing === 'idle';
+  const showType = typing || !v.micOk;
 
   return (
     <section className="card quiz">
@@ -72,32 +75,32 @@ export function Practice({ p, mode, setMode, keysOk }: { p: P; mode: Mode; setMo
       )}
 
       {v.phase === 'running' && (
-        <>
-          <button
-            ref={p.micRef}
-            className={'mic ' + v.hearing}
-            onClick={p.tapMic}
-            aria-label="Microphone"
-            disabled={!v.micOk}
-          >
-            <span className="ring" />
-            <span className="icon">🎤</span>
-          </button>
-          <p className="status">{v.micOk ? HEARING_TEXT[v.hearing] : 'The microphone is off. Type the answer below.'}</p>
-          {v.heard && <p className="heard">I heard: “{v.heard}”</p>}
-        </>
+        <button
+          ref={p.micRef}
+          className={'mic ' + v.hearing}
+          onClick={p.tapMic}
+          aria-label="Microphone"
+          disabled={!v.micOk}
+        >
+          <span className="ring" />
+          <span className="icon">🎤</span>
+        </button>
       )}
 
-      {v.phase === 'paused' && (
-        <div className="stack">
-          <p className="status">Paused.</p>
-          <button className="btn primary huge" onClick={p.resume}>Keep going</button>
-        </div>
-      )}
+      {/* One line at a time: her feedback, or what the microphone is doing. */}
+      <div className="msg">
+        {v.feedback && !needTap ? (
+          <p className={'feedback ' + v.feedback.kind}>{v.feedback.text}</p>
+        ) : (
+          v.phase === 'running' && <p className="status">{v.micOk ? HEARING_TEXT[v.hearing] : 'The microphone is off. Type the answer.'}</p>
+        )}
+        {v.heard && v.feedback && v.feedback.kind !== 'good' && <p className="heard">I heard “{v.heard}”</p>}
+      </div>
+
+      {v.phase === 'paused' && <button className="btn primary huge" onClick={p.resume}>Keep going</button>}
 
       {v.phase === 'choice' && (
         <div className="stack">
-          <p className="status">That one is tricky. Want to see why?</p>
           <button className="btn primary huge" onClick={p.showWhy}>🔍 Show me why</button>
           <button className="btn" onClick={p.next}>Next question ▶</button>
         </div>
@@ -111,21 +114,19 @@ export function Practice({ p, mode, setMode, keysOk }: { p: P; mode: Mode; setMo
         </div>
       )}
 
-      {v.feedback && <p className={'feedback ' + v.feedback.kind}>{v.feedback.text}</p>}
-
-      {(v.phase === 'running') && (
+      {v.phase === 'running' && (
         <>
-          <div className="controls">
-            <button className="btn ghost" onClick={p.resume}>🔁 Hear it again</button>
-            <button className="btn ghost" onClick={p.stop}>Stop</button>
+          <div className="quiet-row">
+            <button className="quiet" onClick={p.resume}>🔁 Say it again</button>
+            {v.micOk && <button className="quiet" aria-expanded={showType} onClick={() => setTyping((t) => !t)}>⌨️ Type</button>}
+            <button className="quiet" onClick={p.stop}>Stop</button>
           </div>
-          <details className="typed" open={!v.micOk}>
-            <summary>Type instead</summary>
-            <form onSubmit={submit}>
+          {showType && (
+            <form className="typed" onSubmit={submit}>
               <input value={typed} onChange={(e) => setTyped(e.target.value)} inputMode="numeric" placeholder="Type the number" aria-label="Type the answer" />
               <button className="btn" type="submit">Check</button>
             </form>
-          </details>
+          )}
         </>
       )}
     </section>

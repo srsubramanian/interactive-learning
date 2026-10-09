@@ -210,7 +210,9 @@ export function usePractice(deps: Deps) {
         }
         const q = c.q;
         patch({ phase: 'running', q, idx: c.idx, tries: c.attempt, heard: '', feedback: null, error: null });
-        await say((resume ? 'Let us try this one. ' : `Question ${c.idx + 1}. `) + `What is ${words(q)}?`, g);
+        // Two clips, so the saved "What is 7 plus 5?" is reused whatever number the question has.
+        await say(resume ? 'Let us try this one.' : `Question ${c.idx + 1}.`, g);
+        await say(`What is ${words(q)}?`, g);
         resume = false;
         for (;;) {
           if (!alive(g)) return;

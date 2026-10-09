@@ -1,0 +1,17 @@
+{
+  "version": "0.0.1",
+  "configurations": [
+    {
+      "name": "jayshri-math-dev",
+      "runtimeExecutable": "env",
+      "runtimeArgs": ["PORT=3000", "npm", "run", "dev"],
+      "port": 5173
+    },
+    {
+      "name": "jayshri-math",
+      "runtimeExecutable": "node",
+      "runtimeArgs": ["server/index.js"],
+      "port": 3000
+    }
+  ]
+}
