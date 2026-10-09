@@ -73,11 +73,18 @@ async function listenEleven(o: ListenOpts): Promise<string> {
   return text;
 }
 
+const BROKEN: Record<string, string> = {
+  'not-allowed': 'The browser is not allowed to listen. Allow the microphone for this page, then try again.',
+  'service-not-allowed': 'The browser is not allowed to listen. Allow the microphone for this page, then try again.',
+  'audio-capture': 'No microphone was found.',
+  network: 'The browser could not reach its listening service. Use Chrome with internet, or set STT_PROVIDER=elevenlabs.'
+};
+
 function listenBrowser(o: ListenOpts): Promise<string> {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const SR = (window as any).SpeechRecognition || (window as any).webkitSpeechRecognition;
   if (!SR) return Promise.reject(new Error('This browser cannot listen. Use Chrome, or set STT_PROVIDER=elevenlabs.'));
-  return new Promise((resolve) => {
+  return new Promise((resolve, reject) => {
     const r = new SR();
     r.lang = 'en-US';
     r.interimResults = false;
@@ -86,7 +93,11 @@ function listenBrowser(o: ListenOpts): Promise<string> {
     const finish = (t: string) => { if (!done) { done = true; resolve(t); } };
     r.onspeechstart = () => o.onHearing();
     r.onresult = (e: any) => finish(String(e.results[0][0].transcript || ''));
-    r.onerror = () => finish('');
+    // Staying quiet is not a failure. A blocked or unreachable recognizer is, and must not sound like "I did not hear you".
+    r.onerror = (e: any) => {
+      const why = BROKEN[String(e.error)];
+      if (why && !done) { done = true; reject(new Error(why)); } else finish('');
+    };
     r.onend = () => finish('');
     o.signal.addEventListener('abort', () => { try { r.abort(); } catch { /* ignore */ } finish(''); });
     setTimeout(() => { try { r.stop(); } catch { /* ignore */ } }, 10000);
