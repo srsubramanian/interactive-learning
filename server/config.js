@@ -5,17 +5,15 @@ import { fileURLToPath } from 'node:url';
 export const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 
 // Tiny .env loader (KEY=value lines), so no extra package is needed.
-// "KEY=value   # note" keeps only "value"; quote the value if it really contains " #".
+// A value may be in quotes, and may be followed by a "# note" like the ones in .env.example.
 export function parseEnvLine(line) {
   if (line.trim().startsWith('#')) return null;
   const m = line.match(/^\s*([A-Z0-9_]+)\s*=\s*(.*?)\s*$/);
   if (!m) return null;
-  let v = m[2];
-  const q = v.match(/^(["'])(.*)\1(\s+#.*)?$/);
-  if (q) v = q[2];
-  else v = v.replace(/(^|\s+)#.*$/, '').trim();
-  return [m[1], v];
+  const quoted = m[2].match(/^(["'])(.*?)\1/);
+  return [m[1], quoted ? quoted[2] : m[2].replace(/(^|\s+)#.*$/, '')];
 }
+
 try {
   const envPath = path.join(ROOT, '.env');
   if (fs.existsSync(envPath)) {
@@ -32,6 +30,7 @@ const env = process.env;
 
 export const config = {
   port: Number(env.PORT || 3000),
+  dataDir: env.DATA_DIR || path.join(ROOT, 'data'), // progress, saved lessons and saved speech clips
   anthropicKey: env.ANTHROPIC_API_KEY || '',
   elevenKey: env.ELEVENLABS_API_KEY || '',
   claudeModel: env.CLAUDE_MODEL || 'claude-haiku-5-5',

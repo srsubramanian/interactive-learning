@@ -61,6 +61,7 @@ Run through this after changes, on the Mac (`npm run dev`) and on the iPad:
 ## Notes
 - Keys stay in the local server. The browser never sees them.
 - Her progress and saved Claude lessons are saved in `data/store.json` on this computer.
+- Every sentence the voice speaks is saved in `data/tts` and reused, so ElevenLabs is only asked for each sentence once.
 - Audio goes to ElevenLabs (speaking and listening). Only the text of what she said goes to Anthropic. With `STT_PROVIDER=browser`, Chrome sends her audio to Google instead.
 - Arithmetic is decided in code; Claude only words the feedback. Custom lessons are checked in code before showing.
 - If the voice is not found, set `ELEVENLABS_VOICE_ID` in `.env`. `STT_PROVIDER=browser` listens with Chrome instead of ElevenLabs.

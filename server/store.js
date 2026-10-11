@@ -1,9 +1,9 @@
 import fs from 'node:fs';
 import path from 'node:path';
-import { ROOT } from './config.js';
+import { config } from './config.js';
 import { cleanStore } from './schema.js';
 
-const DATA_DIR = process.env.DATA_DIR || path.join(ROOT, 'data');
+const DATA_DIR = config.dataDir;
 const FILE = path.join(DATA_DIR, 'store.json');
 
 export function readStore() {

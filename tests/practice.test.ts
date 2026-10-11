@@ -75,7 +75,7 @@ describe('practice round', () => {
     expect(m.attempts).toHaveLength(1);
     expect(m.p.view.results).toEqual(['first']);
     expect(m.p.view.idx).toBe(1);
-    expect(m.speaker.said.at(-1)).toMatch(/^Question 2\./);
+    expect(m.speaker.said.slice(m.speaker.said.lastIndexOf('Yes!'))).toContain('Question 2.');
   });
 
   it('a listening error stops the round on the error panel', async () => {
