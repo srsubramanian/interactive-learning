@@ -3,12 +3,14 @@
 First-grade math buddy for Subra's daughter. She hears each question (ElevenLabs TTS), sees it on screen, answers by voice; Claude Haiku words the feedback; an Explain tab shows picture lessons.
 
 ## Layout
-- `server/` Node ESM API (no server deps), 127.0.0.1:3000. `index.js` routes, `eleven.js` TTS/STT, `claude.js` judge + custom lessons, `schema.js` sanitizing/validation, `store.js` saves `data/store.json`.
+- `server/` Node ESM API (no server deps), 127.0.0.1:3000 by default. `index.js` routes + host/cross-site checks, `pin.js` PIN gate, `eleven.js` TTS/STT, `claude.js` judge + custom lessons, `schema.js` sanitizing/validation, `store.js` saves `data/store.json`.
+- iPad on home Wi-Fi: `HOST=0.0.0.0` + `HTTPS_CERT`/`HTTPS_KEY` (mkcert) + `APP_PIN` in `.env` (README). Tailscale is the away-from-home option.
 - `src/` Vite + React + TS client. `hooks/usePractice.ts` is the practice state machine (mutable `core` ref + generation token for cancellation). `audio/` speech + VAD listening. `lessons/builders.ts` built-in picture lessons (4 depth levels). `state/level.ts` understanding level.
 - `tests/` vitest (`npm test`). Dev: `npm run dev` -> http://localhost:5173 (proxies /api). Prod: `npm run build && npm start`.
 
 ## Rules to keep
 - API keys only in `.env`, only used by the server. Never send them to the client.
+- The server refuses to listen beyond localhost without `APP_PIN`. Keep it that way; every `/api/` route except `config` and `pin` needs the PIN cookie.
 - Arithmetic correctness is decided in code, never by the model. Lessons from Claude are data-only and must pass `cleanLesson` + `lessonConsistent`.
 - Treat transcripts, topics and saved lessons as untrusted text.
 - Voice only through ElevenLabs; answer review through Claude (default `claude-haiku-5-5`).
