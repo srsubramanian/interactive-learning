@@ -14,7 +14,7 @@ Everyday use without the dev server: `npm run build`, then `npm start` and open 
 ## Use it on the iPad (home Wi-Fi)
 The microphone only works on `https://` pages, so the Mac serves the app over HTTPS with a certificate made by `mkcert`, and the iPad trusts that certificate once. The keys stay on the Mac. A PIN keeps other devices on your Wi-Fi from using the app.
 
-**One time, on the Mac** (in this folder):
+**One time, on the Mac** (in this folder): run `npm run setup:ipad`. It does everything below for you (installs mkcert, makes the certificate, adds the settings and a new PIN to `.env`, builds the app) and prints what to do on the iPad. Or by hand:
 ```
 brew install mkcert
 mkcert -install

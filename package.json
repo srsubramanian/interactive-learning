@@ -7,7 +7,8 @@
     "dev": "concurrently -k -n api,web -c blue,magenta \"node server/index.js\" \"vite\"",
     "build": "tsc --noEmit && vite build",
     "start": "node server/index.js",
-    "test": "vitest run"
+    "test": "vitest run",
+    "setup:ipad": "bash scripts/setup-ipad.sh"
   },
   "dependencies": {
     "react": "^18.3.1",
