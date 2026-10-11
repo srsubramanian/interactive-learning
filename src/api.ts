@@ -12,6 +12,7 @@ const post = (url: string, body: unknown) =>
   fetch(url, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify(body) });
 
 export const getConfig = () => fetch('/api/config').then((r) => j<Config>(r));
+export const pinApi = (pin: string) => post('/api/pin', { pin }).then((r) => j<{ ok: true }>(r));
 
 export async function fetchTts(text: string): Promise<Blob> {
   const r = await post('/api/tts', { text });

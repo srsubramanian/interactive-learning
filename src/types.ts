@@ -28,6 +28,9 @@ export interface Attempt { r: Result; a: number; b: number; op: Op; said: number
 export interface Store { progress: { add: Attempt[]; sub: Attempt[] }; lessons: Lesson[] }
 export interface Question { a: number; b: number; op: Op; answer: number }
 
-export interface Config { sttProvider: 'elevenlabs' | 'browser'; hasElevenLabs: boolean; hasAnthropic: boolean; model: string }
+export interface Config {
+  sttProvider: 'elevenlabs' | 'browser'; hasElevenLabs: boolean; hasAnthropic: boolean; model: string;
+  needPin: boolean; pinOk: boolean;
+}
 export interface JudgeResult { said: number | null; verdict: 'correct' | 'wrong' | 'unclear'; line: string; answer: number }
 export interface ExplainRequest { a: number; b: number; op: Op; level: number; said: number | null }

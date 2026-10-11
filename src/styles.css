@@ -37,6 +37,7 @@ nav button.on { background: var(--sun); color: var(--sun-ink); border-color: var
 input, select { font: inherit; padding: 10px 12px; border-radius: 12px; border: 2px solid var(--line); background: var(--card); color: var(--ink); }
 .row { display: flex; gap: 8px; align-items: center; }
 .num { width: 80px; text-align: center; font-size: 22px; }
+.num.pin { width: 160px; letter-spacing: 6px; }
 .question { font-size: clamp(44px, 12vw, 72px); font-weight: 600; letter-spacing: 2px; }
 .opsym { color: var(--ink2); }
 .qmark { color: var(--dot-b); }
