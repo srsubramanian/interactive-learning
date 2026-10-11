@@ -89,12 +89,12 @@ export function Explain({ speaker, store, request, hasAnthropic, skill, addLesso
         <h2>Show me a picture</h2>
         <p className="hint">Pick numbers and how deep to go. The built-in pictures are instant. Claude can draw a custom one.</p>
         <div className="row">
-          <input className="num" value={a} onChange={(e) => setA(e.target.value)} inputMode="numeric" aria-label="First number" />
-          <select value={op} onChange={(e) => setOp(e.target.value as Op)} aria-label="Plus or minus">
+          <input className="num" value={a} onChange={(e) => { setA(e.target.value); setSaid(null); }} inputMode="numeric" aria-label="First number" />
+          <select value={op} onChange={(e) => { setOp(e.target.value as Op); setSaid(null); }} aria-label="Plus or minus">
             <option value="+">+</option>
             <option value="-">−</option>
           </select>
-          <input className="num" value={b} onChange={(e) => setB(e.target.value)} inputMode="numeric" aria-label="Second number" />
+          <input className="num" value={b} onChange={(e) => { setB(e.target.value); setSaid(null); }} inputMode="numeric" aria-label="Second number" />
         </div>
         <label className="field">
           <span>How deep?</span>

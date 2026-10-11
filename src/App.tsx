@@ -23,6 +23,7 @@ export default function App() {
   const p = usePractice({
     speaker,
     ensureMedia: media.ensure,
+    primeMedia: media.prime,
     sttProvider: cfg?.sttProvider ?? 'elevenlabs',
     onAttempt: st.addAttempt,
     getLevel: (op) => st.skill(op).level,
