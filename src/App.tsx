@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import { getConfig } from './api';
 import { Speaker } from './audio/speech';
 import { Explain } from './components/Explain';
+import { PinGate } from './components/PinGate';
 import { Practice } from './components/Practice';
 import { useMedia } from './hooks/useMedia';
 import { usePractice } from './hooks/usePractice';
@@ -23,6 +24,7 @@ export default function App() {
   const p = usePractice({
     speaker,
     ensureMedia: media.ensure,
+    primeMedia: media.prime,
     sttProvider: cfg?.sttProvider ?? 'elevenlabs',
     onAttempt: st.addAttempt,
     getLevel: (op) => st.skill(op).level,
@@ -44,7 +46,9 @@ export default function App() {
       {cfgErr && <p className="banner err">The helper server is not running. Start the app with “npm run dev”.</p>}
       {st.saveError && <p className="banner err">Progress could not be saved.</p>}
       <main>
-        {tab === 'practice' ? (
+        {cfg?.needPin && !cfg.pinOk ? (
+          <PinGate />
+        ) : tab === 'practice' ? (
           <Practice p={p} mode={mode} setMode={setMode} keysOk={keysOk} />
         ) : (
           <Explain

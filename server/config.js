@@ -41,5 +41,14 @@ export const config = {
   sttProvider: (env.STT_PROVIDER || 'elevenlabs').toLowerCase(), // "elevenlabs" or "browser"
   anthropicUrl: env.ANTHROPIC_API_URL || 'https://api.anthropic.com/v1/messages',
   elevenBase: env.ELEVENLABS_API_BASE || 'https://api.elevenlabs.io',
-  voiceId: env.ELEVENLABS_VOICE_ID || ''
+  voiceId: env.ELEVENLABS_VOICE_ID || '',
+  // Host names allowed besides localhost, *.local, home-network IPs and Tailscale (*.ts.net), comma separated.
+  allowedHosts: (env.ALLOWED_HOSTS || '').split(',').map((h) => h.trim().toLowerCase()).filter(Boolean),
+  // Where to listen. 127.0.0.1 = this Mac only; 0.0.0.0 = also the home network (needs APP_PIN).
+  host: env.HOST || '127.0.0.1',
+  // HTTPS (for the iPad microphone on the home network): certificate and key files, e.g. from mkcert.
+  httpsCert: env.HTTPS_CERT ? path.resolve(ROOT, env.HTTPS_CERT) : '',
+  httpsKey: env.HTTPS_KEY ? path.resolve(ROOT, env.HTTPS_KEY) : '',
+  // PIN asked once per device before the app may use the API keys.
+  appPin: env.APP_PIN || ''
 };

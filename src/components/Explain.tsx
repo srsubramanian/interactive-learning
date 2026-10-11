@@ -100,12 +100,12 @@ export function Explain({ speaker, store, request, hasAnthropic, skill, addLesso
       <section className="card">
         {!lesson && <h2>Show me a picture</h2>}
         <div className="row picker">
-          <input className="num" value={a} onChange={(e) => setA(e.target.value)} inputMode="numeric" aria-label="First number" />
-          <select value={op} onChange={(e) => setOp(e.target.value as Op)} aria-label="Plus or minus">
+          <input className="num" value={a} onChange={(e) => { setA(e.target.value); setSaid(null); }} inputMode="numeric" aria-label="First number" />
+          <select value={op} onChange={(e) => { setOp(e.target.value as Op); setSaid(null); }} aria-label="Plus or minus">
             <option value="+">+</option>
             <option value="-">−</option>
           </select>
-          <input className="num" value={b} onChange={(e) => setB(e.target.value)} inputMode="numeric" aria-label="Second number" />
+          <input className="num" value={b} onChange={(e) => { setB(e.target.value); setSaid(null); }} inputMode="numeric" aria-label="Second number" />
           <button className="btn primary" onClick={() => { const n = nums(); if (!n) setErr('Type two numbers.'); else showBuiltIn(n, op, level, true); }}>▶ Show it</button>
         </div>
         {err && <p className="err">{err}</p>}

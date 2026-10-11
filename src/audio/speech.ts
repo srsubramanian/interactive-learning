@@ -43,7 +43,8 @@ export class Speaker {
       const cleanup = () => {
         a.removeEventListener('ended', done);
         a.removeEventListener('error', fail);
-        this.cancelCur = null;
+        // A stopped clip can fail late; only clear the cancel handle if it is still this clip's.
+        if (this.cancelCur === done) this.cancelCur = null;
       };
       const done = () => { cleanup(); resolve(); };
       const fail = () => { cleanup(); reject(new Error('The sound could not play.')); };

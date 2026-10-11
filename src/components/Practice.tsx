@@ -53,8 +53,7 @@ export function Practice({ p, mode, setMode, keysOk }: { p: P; mode: Mode; setMo
   const submit = (e: React.FormEvent) => {
     e.preventDefault();
     if (!typed.trim()) return;
-    p.submitTyped(typed.trim());
-    setTyped('');
+    if (p.submitTyped(typed.trim())) setTyped('');
   };
   // After two unclear tries the microphone waits for a tap, so that instruction must show.
   const needTap = v.phase === 'running' && v.micOk && v.hearing === 'idle';
@@ -124,7 +123,7 @@ export function Practice({ p, mode, setMode, keysOk }: { p: P; mode: Mode; setMo
           {showType && (
             <form className="typed" onSubmit={submit}>
               <input value={typed} onChange={(e) => setTyped(e.target.value)} inputMode="numeric" placeholder="Type the number" aria-label="Type the answer" />
-              <button className="btn" type="submit">Check</button>
+              <button className="btn" type="submit" disabled={v.hearing === 'speaking' || v.hearing === 'thinking'}>Check</button>
             </form>
           )}
         </>

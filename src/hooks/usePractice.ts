@@ -27,6 +27,8 @@ export interface PracticeView {
 interface Deps {
   speaker: Speaker;
   ensureMedia: () => Promise<MediaHandle | null>;
+  /** Wakes audio input; must run inside a tap, before any await (iOS). */
+  primeMedia: () => void;
   sttProvider: 'elevenlabs' | 'browser';
   onAttempt: (a: Attempt) => void;
   getLevel: (op: Op) => number;
@@ -54,6 +56,8 @@ export function usePractice(deps: Deps) {
     attempt: 1,
     unclear: 0,
     q: null as Question | null,
+    /** The current question already has its result recorded. */
+    done: false,
     seen: new Set<string>(),
     results: [] as Result[],
     mode: 'mix20' as Mode,
@@ -95,27 +99,24 @@ export function usePractice(deps: Deps) {
 
   const record = (r: Result, q: Question, said: number | null) => {
     const c = core.current;
+    c.done = true;
     c.results.push(r);
     d.current.onAttempt({ r, a: q.a, b: q.b, op: q.op, said, ts: Date.now() });
     patch({ results: [...c.results] });
   };
 
+  // A listening error rejects, which ends the round with the error panel (see loop).
   const runListen = async (g: number, signal: AbortSignal): Promise<string> => {
     const c = core.current;
     if (!c.media || !alive(g)) return '';
     patch({ hearing: 'waiting' });
-    try {
-      return await listenOnce({
-        media: c.media,
-        provider: d.current.sttProvider,
-        signal,
-        onLevel: setLevel,
-        onHearing: () => alive(g) && patch({ hearing: 'hearing' })
-      });
-    } catch (e) {
-      if (alive(g)) fail(g, (e as Error).message);
-      return '';
-    }
+    return listenOnce({
+      media: c.media,
+      provider: d.current.sttProvider,
+      signal,
+      onLevel: setLevel,
+      onHearing: () => alive(g) && patch({ hearing: 'hearing' })
+    });
   };
 
   /** Waits for either a spoken or a typed answer. null means the round was cancelled. */
@@ -135,12 +136,15 @@ export function usePractice(deps: Deps) {
     } else {
       spoken = runListen(g, ctl.signal);
     }
-    const text = await Promise.race([typed, spoken]);
-    ctl.abort();
-    c.typedResolve = null;
-    c.tapResolve = null;
-    setLevel(0);
-    return alive(g) ? text : null;
+    try {
+      const text = await Promise.race([typed, spoken]);
+      return alive(g) ? text : null;
+    } finally {
+      ctl.abort();
+      c.typedResolve = null;
+      c.tapResolve = null;
+      setLevel(0);
+    }
   };
 
   const attemptOnce = async (g: number): Promise<Outcome> => {
@@ -201,9 +205,16 @@ export function usePractice(deps: Deps) {
   const loop = async (g: number, resume: boolean) => {
     const c = core.current;
     try {
+      // Interrupted after her answer was recorded (for example "Hear it again" during the cheer):
+      // move on instead of asking the same question again.
+      if (resume && c.q && c.done) {
+        c.idx++;
+        resume = false;
+      }
       while (alive(g) && c.idx < TOTAL) {
         if (!resume || !c.q) {
           c.q = makeQuestion(c.mode, c.seen);
+          c.done = false;
           c.attempt = 1;
           c.unclear = 0;
           c.lastWrong = null;
@@ -232,10 +243,11 @@ export function usePractice(deps: Deps) {
 
   const start = useCallback(async (mode: Mode) => {
     const c = core.current;
+    d.current.primeMedia();
     cancelAll();
     await d.current.speaker.unlock();
     c.media = await d.current.ensureMedia();
-    Object.assign(c, { idx: 0, attempt: 1, unclear: 0, q: null, seen: new Set<string>(), results: [], mode, lastWrong: null });
+    Object.assign(c, { idx: 0, attempt: 1, unclear: 0, q: null, done: false, seen: new Set<string>(), results: [], mode, lastWrong: null });
     setView({ ...INITIAL, micOk: !!c.media, phase: 'running' });
     core.current.phase = 'running';
     const g = ++c.gen;
@@ -253,6 +265,7 @@ export function usePractice(deps: Deps) {
   /** Ask the current question again (also used to resume after a pause or an error). */
   const resume = useCallback(() => {
     const c = core.current;
+    d.current.primeMedia();
     cancelAll();
     if (!c.q) return;
     patch({ error: null });
@@ -262,6 +275,7 @@ export function usePractice(deps: Deps) {
 
   const next = useCallback(() => {
     const c = core.current;
+    d.current.primeMedia();
     cancelAll();
     c.idx++;
     c.q = null;
@@ -276,8 +290,17 @@ export function usePractice(deps: Deps) {
     d.current.onExplain({ a: c.q.a, b: c.q.b, op: c.q.op, said: c.lastWrong, level: Math.min(d.current.getLevel(c.q.op), 3) });
   }, []);
 
-  const submitTyped = useCallback((s: string) => core.current.typedResolve?.(s), []);
-  const tapMic = useCallback(() => core.current.tapResolve?.(), []);
+  /** False if no answer is wanted right now (she is listening to the question); keep the text then. */
+  const submitTyped = useCallback((s: string) => {
+    const r = core.current.typedResolve;
+    if (!r) return false;
+    r(s);
+    return true;
+  }, []);
+  const tapMic = useCallback(() => {
+    d.current.primeMedia();
+    core.current.tapResolve?.();
+  }, []);
 
   // Leaving the Practice tab pauses the round.
   useEffect(() => {

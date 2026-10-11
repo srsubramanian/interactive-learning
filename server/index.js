@@ -5,20 +5,26 @@
   - Claude: reviews spoken answers and can draw custom picture lessons.
   - Keeps both API keys on this computer; the browser never sees them.
   In production (npm start) it also serves the built React app from dist/.
+  With HOST=0.0.0.0 + HTTPS_CERT/HTTPS_KEY + APP_PIN it can be opened from the iPad on the home network.
 */
 import http from 'node:http';
+import https from 'node:https';
 import fs from 'node:fs';
+import os from 'node:os';
 import path from 'node:path';
+import { execFileSync } from 'node:child_process';
 import { pathToFileURL } from 'node:url';
 import { config, ROOT } from './config.js';
 import { tts, stt } from './eleven.js';
 import { judge, explain } from './claude.js';
+import { pinOk, pinRequired, tryPin } from './pin.js';
 import { readStore, writeStore } from './store.js';
 
 const DIST = path.join(ROOT, 'dist');
 const MIME = {
   '.html': 'text/html; charset=utf-8', '.js': 'text/javascript', '.css': 'text/css', '.svg': 'image/svg+xml',
-  '.ico': 'image/x-icon', '.json': 'application/json', '.png': 'image/png', '.woff2': 'font/woff2', '.map': 'application/json'
+  '.ico': 'image/x-icon', '.json': 'application/json', '.png': 'image/png', '.woff2': 'font/woff2', '.map': 'application/json',
+  '.webmanifest': 'application/manifest+json'
 };
 
 function readBody(req, limit) {
@@ -43,14 +49,44 @@ const needKey = (res, key, name) => {
   return true;
 };
 
-export const server = http.createServer(async (req, res) => {
+// Only answer when the page was opened at an address we expect. This stops a web page on some
+// other site from using this server (and the API keys behind it), including by DNS rebinding:
+// a rebinding page always arrives with its own public name, never a .local name or a home IP.
+const PRIVATE_IP = /^(10\.\d+|172\.(1[6-9]|2\d|3[01])|192\.168)\.\d+\.\d+$/;
+export function hostAllowed(host) {
+  const name = String(host || '').toLowerCase().replace(/:\d+$/, '').replace(/^\[|\]$/g, '');
+  return name === 'localhost' || name === '127.0.0.1' || name === '::1' || name.endsWith('.local') || PRIVATE_IP.test(name) ||
+    name.endsWith('.ts.net') || config.allowedHosts.includes(name);
+}
+// Writes must come from this app: browsers send Sec-Fetch-Site, and a JSON or audio body cannot be
+// sent cross-site without a CORS preflight, which this server never approves.
+function crossSiteWrite(req) {
+  if (req.headers['sec-fetch-site'] === 'cross-site') return true;
+  const type = String(req.headers['content-type'] || '').split(';')[0].trim().toLowerCase();
+  return req.url.startsWith('/api/stt') ? !type.startsWith('audio/') : type !== 'application/json';
+}
+
+async function handle(req, res) {
   try {
+    if (!hostAllowed(req.headers.host)) return sendJson(res, 403, { error: 'Unknown host. Add it to ALLOWED_HOSTS in .env.' });
     const url = new URL(req.url, 'http://localhost');
     const p = url.pathname;
+    if (req.method === 'POST' && p.startsWith('/api/') && crossSiteWrite(req)) return sendJson(res, 403, { error: 'Not allowed.' });
 
     if (req.method === 'GET' && p === '/api/config') {
-      return sendJson(res, 200, { sttProvider: config.sttProvider, hasElevenLabs: !!config.elevenKey, hasAnthropic: !!config.anthropicKey, model: config.claudeModel });
+      return sendJson(res, 200, {
+        sttProvider: config.sttProvider, hasElevenLabs: !!config.elevenKey, hasAnthropic: !!config.anthropicKey, model: config.claudeModel,
+        needPin: pinRequired(), pinOk: pinOk(req)
+      });
     }
+    if (req.method === 'POST' && p === '/api/pin') {
+      const { pin } = JSON.parse((await readBody(req, 1000)).toString() || '{}');
+      const r = tryPin(req, pin);
+      if (!r.ok) return sendJson(res, r.status, { error: r.error });
+      res.writeHead(200, { 'content-type': 'application/json', 'cache-control': 'no-store', 'set-cookie': r.cookie });
+      return res.end('{"ok":true}');
+    }
+    if (p.startsWith('/api/') && !pinOk(req)) return sendJson(res, 401, { error: 'Enter the PIN first.' });
     if (req.method === 'POST' && p === '/api/tts') {
       if (needKey(res, config.elevenKey, 'ELEVENLABS_API_KEY')) return;
       const { text } = JSON.parse((await readBody(req, 20000)).toString() || '{}');
@@ -95,11 +131,43 @@ export const server = http.createServer(async (req, res) => {
     console.error(e.message);
     sendJson(res, 500, { error: e.message });
   }
-});
+}
+
+function tlsOptions() {
+  if (!config.httpsCert && !config.httpsKey) return null;
+  for (const [name, file] of [['HTTPS_CERT', config.httpsCert], ['HTTPS_KEY', config.httpsKey]]) {
+    if (!file || !fs.existsSync(file)) throw new Error(name + ' file not found: ' + (file || '(not set)') + '. See "Use it on the iPad" in README.md.');
+  }
+  return { cert: fs.readFileSync(config.httpsCert), key: fs.readFileSync(config.httpsKey) };
+}
+const tls = tlsOptions();
+export const server = tls ? https.createServer(tls, handle) : http.createServer(handle);
+
+/** Addresses to type on the iPad, best first. */
+function lanAddresses(scheme) {
+  const out = [];
+  try {
+    if (process.platform === 'darwin') out.push(execFileSync('scutil', ['--get', 'LocalHostName']).toString().trim() + '.local');
+  } catch { /* ignore */ }
+  for (const list of Object.values(os.networkInterfaces())) {
+    for (const a of list || []) if (a.family === 'IPv4' && !a.internal) out.push(a.address);
+  }
+  return out.map((h) => scheme + '://' + h + ':' + config.port);
+}
 
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
-  server.listen(config.port, '127.0.0.1', () => {
-    console.log('Jayshri Math Voice API: http://localhost:' + config.port);
+  const local = ['127.0.0.1', 'localhost', '::1'].includes(config.host);
+  if (!local && !config.appPin) {
+    console.error('HOST=' + config.host + ' lets other devices reach this server and your API keys. Set APP_PIN in .env first.');
+    process.exit(1);
+  }
+  const scheme = tls ? 'https' : 'http';
+  server.listen(config.port, config.host, () => {
+    console.log('Jayshri Math Voice: ' + scheme + '://localhost:' + config.port);
+    if (!local) {
+      console.log('On the iPad (same Wi-Fi), open: ' + lanAddresses(scheme).join('  or  '));
+      if (!tls) console.log('Note: without HTTPS_CERT/HTTPS_KEY the iPad cannot use the microphone.');
+    }
     if (!config.elevenKey) console.log('Missing ELEVENLABS_API_KEY (add it to .env)');
     if (!config.anthropicKey) console.log('Missing ANTHROPIC_API_KEY (add it to .env)');
     console.log('Claude model:', config.claudeModel, '| Listening with:', config.sttProvider);
